@@ -468,5 +468,18 @@ public class SaveProcessMainXML {
 		}
 	
 	
-
+	public void Hello(String[] Hola)
+	{
+		main(null);		
+	}
+	
+	public void Hello2(String Hola)
+	{
+		main(null);		
+	}
+	
+	public void Hello3()
+	{
+	main(null);	
+	}
 }
