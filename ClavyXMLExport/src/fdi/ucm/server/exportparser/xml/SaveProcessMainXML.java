@@ -14,6 +14,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import fdi.ucm.server.modelComplete.CompleteImportRuntimeException;
 import fdi.ucm.server.modelComplete.collection.CompleteCollection;
 import fdi.ucm.server.modelComplete.collection.CompleteLogAndUpdates;
 import fdi.ucm.server.modelComplete.collection.document.CompleteDocuments;
@@ -49,7 +50,7 @@ public class SaveProcessMainXML {
 	public static String processCompleteCollection(CompleteLogAndUpdates cL,
 			CompleteCollection salvar, boolean Estructura, boolean Documentos, boolean Archivos,
 			String pathTemporalFiles) throws IOException{
-		String rutaArchivo = pathTemporalFiles+"/"+System.nanoTime()+".xls";
+		String rutaArchivo = pathTemporalFiles+"/"+System.nanoTime()+".xml";
 		try {
 			DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
 			DocumentBuilder docBuilder = docFactory.newDocumentBuilder();
@@ -58,9 +59,6 @@ public class SaveProcessMainXML {
 			Element rootElement = doc.createElement("Collection");
 			doc.appendChild(rootElement);
 			
-			
-			if (Estructura)
-			{
 			Attr attr = doc.createAttribute("id");
 			attr.setValue(Long.toString(salvar.getClavilenoid()));
 			rootElement.setAttributeNode(attr);
@@ -73,6 +71,10 @@ public class SaveProcessMainXML {
 			CDescripcion.appendChild(doc.createTextNode(salvar.getDescription()));
 			rootElement.appendChild(CDescripcion);
 			
+			if (Estructura)
+			{
+			
+			
 			for (CompleteGrammar CG : salvar.getMetamodelGrammar()) {
 				
 				Element Grammar = doc.createElement("Grammar");
@@ -83,9 +85,9 @@ public class SaveProcessMainXML {
 				attrid.setValue(Long.toString(CG.getClavilenoid()));
 				Grammar.setAttributeNode(attrid);
 				
-				Element attrName = doc.createElement("Name");
-				attrName.appendChild(doc.createTextNode(CG.getNombre()));
-				Grammar.appendChild(attrName);
+				Attr attrName = doc.createAttribute("Name");
+				attrName.setValue(CG.getNombre());
+				Grammar.setAttributeNode(attrName);
 				
 				Element attrDescription = doc.createElement("Description");
 				attrDescription.appendChild(doc.createTextNode(CG.getDescription()));
@@ -116,14 +118,15 @@ public class SaveProcessMainXML {
 					attrGid.setValue(Long.toString(CGCD.getClavilenoid()));
 					attrType.setAttributeNode(attrGid);
 					
-					Element attrGName = doc.createElement("Name");
-					attrGName.appendChild(doc.createTextNode(CGCD.getNombre()));
-					attrType.appendChild(attrGName);
+					Attr attrGName = doc.createAttribute("Name");
+					attrGName.setValue(CGCD.getNombre());
+					attrType.setAttributeNode(attrGName);
 					
 					Element attrGDescription = doc.createElement("Description");
 					attrGDescription.appendChild(doc.createTextNode(CGCD.getDescription()));
 					attrType.appendChild(attrGDescription);
 				}
+				Documento.appendChild(attrType);
 //				attrType.setValue(CD.getDocument());
 
 				
@@ -137,36 +140,43 @@ public class SaveProcessMainXML {
 				
 				for (CompleteElement CE : CD.getDescription()) {
 					
+					
+					String Ambito=genera_ambito(CE);
 					Element Elemento = doc.createElement("Elemento");
-					rootElement.appendChild(Elemento);
-			 
+					Documento.appendChild(Elemento);
+
 					
 					Attr attrEid = doc.createAttribute("id");
+					attrEid.setValue(Long.toString(CE.getClavilenoid()));
+					Elemento.setAttributeNode(attrEid);
 					
-					try {
-						attrEid.setValue(Long.toString(CE.getClavilenoid()));
-						Elemento.setAttributeNode(attrEid);
-					} catch (Exception e) {
-						e.printStackTrace();
+					if (!Ambito.isEmpty())
+					{
+					Attr attrESco = doc.createAttribute("Scope");
+					attrESco.setValue(Ambito);
+					Elemento.setAttributeNode(attrESco);
 					}
 					
-
+					
 					Element attrETypeID = doc.createElement("ValueType");
+					Elemento.appendChild(attrETypeID);
 					procesStructureES(attrETypeID,doc,CE.getHastype(),false);
 					
 					Element attrEValue = doc.createElement("Value");
+					Elemento.appendChild(attrEValue);
 					getValue(attrEValue,CE,doc);
 
 					
 					
 				}
 			}
+			}
 			
 			if (Archivos)
 			{
 			for (CompleteFile CF : salvar.getSectionValues()) {
 				
-				Element File = doc.createElement("File/URL");
+				Element File = doc.createElement("File_URL");
 				rootElement.appendChild(File);
 		 
 				
@@ -174,19 +184,19 @@ public class SaveProcessMainXML {
 				attrid.setValue(Long.toString(CF.getClavilenoid()));
 				File.setAttributeNode(attrid);
 				
-				Element attrName = doc.createElement("Path/URI");
+				Element attrName = doc.createElement("Path_URI");
 				attrName.appendChild(doc.createTextNode(CF.getPath()));
 				File.appendChild(attrName);
 				
 			}
-			}
+			
 			}
 			
 			TransformerFactory transformerFactory = TransformerFactory.newInstance();
 			Transformer transformer = transformerFactory.newTransformer();
 			DOMSource source = new DOMSource(doc);
 			
-			StreamResult result = new StreamResult(new File("rutaArchivo"));
+			StreamResult result = new StreamResult(new File(rutaArchivo));
 			 
 			// Output to console for testing
 			// StreamResult result = new StreamResult(System.out);
@@ -197,41 +207,89 @@ public class SaveProcessMainXML {
 			
 			
 		} catch (Exception e) {
-			cL.getLogLines().add("Error en la creacion del XML: " + e.getMessage() );
 			e.printStackTrace();
+			throw new CompleteImportRuntimeException("Error en la creacion del XML: "+e.getMessage());
 		}
 		return rutaArchivo;
 	}
 
 	
+	private static String genera_ambito(CompleteElement cE) {
+		StringBuffer Ambito = new StringBuffer();
+		for (Integer ambitos : cE.getAmbitos()) {
+			if (!Ambito.toString().isEmpty())
+				Ambito.append(".");
+			Ambito.append(ambitos);
+		}
+		return Ambito.toString();
+	}
+
+
 	private static void getValue(Element attrEValue,CompleteElement cE,Document doc) {
+		
+		Attr attrtype = doc.createAttribute("type");
+		attrEValue.setAttributeNode(attrtype);
+		
 		if (cE instanceof CompleteTextElement)
 			{
-			Element attrV = doc.createElement("Text");
-			attrV.appendChild(doc.createTextNode(((CompleteTextElement) cE).getValue()));
-			attrEValue.appendChild(attrV);
+			attrtype.setValue("Text");
+			
+			if (((CompleteTextElement) cE).getValue()!=null)
+			{
+				attrEValue.appendChild(doc.createTextNode(((CompleteTextElement) cE).getValue()));
+			}
+			
 			}
 		else
 			if (cE instanceof CompleteLinkElement)
 			{
-				Element attrV = doc.createElement("Relation");
-				attrEValue.appendChild(attrV);
-//				attrV.appendChild(doc.createTextNode(((CompleteTextElement) cE).getValue()));
+				attrtype.setValue("Relation Document");
+				
+				if (((CompleteLinkElement) cE).getValue()!=null)
+				{
+				Element attrid = doc.createElement("id");
+				attrid.appendChild(doc.createTextNode((Long.toString(((CompleteLinkElement) cE).getValue().getClavilenoid()))));
+				attrEValue.appendChild(attrid);
+				
+				Element attrName = doc.createElement("Icon");
+				attrName.appendChild(doc.createTextNode(((CompleteLinkElement) cE).getValue().getIcon()));
+				attrEValue.appendChild(attrName);
+				
+				Element attrDesc = doc.createElement("Description");
+				attrDesc.appendChild(doc.createTextNode(((CompleteLinkElement) cE).getValue().getDescriptionText()));
+				attrEValue.appendChild(attrDesc);
+				}
+
 				
 			}
 			else
 				if (cE instanceof CompleteResourceElementFile)
 				{
-					Element attrV = doc.createElement("File");
-					attrEValue.appendChild(attrV);
-//					attrV.setValue(((CompleteTextElement) cE).getValue());
+					attrtype.setValue("Relation Resource");
+					
+					if (((CompleteResourceElementFile) cE).getValue()!=null)
+					{
+						Element attrid = doc.createElement("id");
+						attrid.appendChild(doc.createTextNode((Long.toString(((CompleteResourceElementFile) cE).getValue().getClavilenoid()))));
+						attrEValue.appendChild(attrid);
+					
+					Element attrName = doc.createElement("Path_URI");
+					attrName.appendChild(doc.createTextNode(((CompleteResourceElementFile) cE).getValue().getPath()));
+					attrEValue.appendChild(attrName);
+					}
+
 				}
 				else
 					if (cE instanceof CompleteResourceElementURL)
 					{
-						Element attrV = doc.createElement("URL");
-						attrEValue.appendChild(attrV);
-//						attrV.setValue(((CompleteTextElement) cE).getValue());
+						attrtype.setValue("Relation Resource");
+						
+						if (((CompleteResourceElementURL) cE).getValue()!=null)
+						{
+						Element attrName = doc.createElement("Path_URI");
+						attrName.appendChild(doc.createTextNode(((CompleteResourceElementURL) cE).getValue()));
+						attrEValue.appendChild(attrName);
+						}
 					}
 		
 	}
@@ -240,14 +298,11 @@ public class SaveProcessMainXML {
 	private static void procesStructureES(Element attrETypeID, Document doc,
 			CompleteElementType son, boolean b) {
 		
-		
-		Element Structure = doc.createElement("Structure");
-		attrETypeID.appendChild(Structure);
- 
+		 
 		
 		Attr attrid = doc.createAttribute("id");
 		attrid.setValue(Long.toString(son.getClavilenoid()));
-		Structure.setAttributeNode(attrid);
+		attrETypeID.setAttributeNode(attrid);
 		
 		
 		String Class="unknown";
@@ -260,13 +315,13 @@ public class SaveProcessMainXML {
 			else if (son instanceof CompleteLinkElementType)
 				Class="Relation Document Element";
 
-			Element attrClase = doc.createElement("Class");
-			attrClase.appendChild(doc.createTextNode(Class));
-			Structure.appendChild(attrClase);
+			Attr attrClase = doc.createAttribute("Class");
+			attrClase.setValue(Class);
+			attrETypeID.setAttributeNode(attrClase);
 			
-			Element attrName = doc.createElement("Name");
-		attrName.appendChild(doc.createTextNode(ProduceName(son)));
-		Structure.appendChild(attrName);
+			Attr attrName = doc.createAttribute("Name");
+		attrName.setValue(ProduceName(son));
+		attrETypeID.setAttributeNode(attrName);
 		
 		
 		
@@ -283,7 +338,7 @@ public class SaveProcessMainXML {
 			Name="*";
 
 		if (son.getFather()==null)
-			return son.getCollectionFather()+"/"+Name;
+			return son.getCollectionFather().getNombre()+"/"+Name;
 		else
 			return ProduceName(son.getFather())+"/"+Name;
 	}
@@ -323,13 +378,13 @@ public class SaveProcessMainXML {
 			}
 				
 			
-			Element attrClase = doc.createElement("Class");
-			attrClase.appendChild(doc.createTextNode(Class));
-			Structure.appendChild(attrClase);
+			Attr attrClase = doc.createAttribute("Class");
+			attrClase.setValue(Class);
+			Structure.setAttributeNode(attrClase);
 			
-			Element attrName = doc.createElement("Name");
-			attrName.appendChild(doc.createTextNode(Name));
-			Structure.appendChild(attrName);
+			Attr attrName = doc.createAttribute("Name");
+			attrName.setValue(Name);
+			Structure.setAttributeNode(attrName);
 			
 			
 			
