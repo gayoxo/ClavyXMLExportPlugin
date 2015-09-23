@@ -5,6 +5,9 @@ package fdi.ucm.server.exportparser.xml;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.List;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -113,18 +116,23 @@ public class SaveProcessMainXML {
 				
 				Element attrType = doc.createElement("DocumentType");
 				{
-					CompleteGrammar CGCD=CD.getDocument();
-					Attr attrGid = doc.createAttribute("id");
-					attrGid.setValue(Long.toString(CGCD.getClavilenoid()));
-					attrType.setAttributeNode(attrGid);
+					for (CompleteGrammar CGCD : salvar.getMetamodelGrammar()) {
+						if (isInGrammar(CD,CGCD))
+						{
+						Attr attrGid = doc.createAttribute("id");
+						attrGid.setValue(Long.toString(CGCD.getClavilenoid()));
+						attrType.setAttributeNode(attrGid);
+						
+						Attr attrGName = doc.createAttribute("Name");
+						attrGName.setValue(CGCD.getNombre());
+						attrType.setAttributeNode(attrGName);
+						
+						Element attrGDescription = doc.createElement("Description");
+						attrGDescription.appendChild(doc.createTextNode(CGCD.getDescription()));
+						attrType.appendChild(attrGDescription);
+						}
+					}
 					
-					Attr attrGName = doc.createAttribute("Name");
-					attrGName.setValue(CGCD.getNombre());
-					attrType.setAttributeNode(attrGName);
-					
-					Element attrGDescription = doc.createElement("Description");
-					attrGDescription.appendChild(doc.createTextNode(CGCD.getDescription()));
-					attrType.appendChild(attrGDescription);
 				}
 				Documento.appendChild(attrType);
 //				attrType.setValue(CD.getDocument());
@@ -482,4 +490,29 @@ public class SaveProcessMainXML {
 	{
 	main(null);	
 	}
+	
+	public static boolean isInGrammar(CompleteDocuments iterable_element,
+			CompleteGrammar completeGrammar) {
+		HashSet<Long> ElemT=new HashSet<Long>();
+		for (CompleteElement dd : iterable_element.getDescription()) {
+			ElemT.add(dd.getHastype().getClavilenoid());
+		}
+		
+		return isInGrammar(ElemT, completeGrammar.getSons());
+		
+		
+	}
+
+
+
+	private static boolean isInGrammar(HashSet<Long> elemT,
+			List<CompleteStructure> sons) {
+		for (CompleteStructure CSlong1 : sons) {
+			if (elemT.contains(CSlong1.getClavilenoid())||isInGrammar(elemT, CSlong1.getSons()))
+				return true;
+			
+		}
+		return false;
+	}
+	
 }
